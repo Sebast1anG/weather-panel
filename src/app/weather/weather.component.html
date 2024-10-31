@@ -1,0 +1,20 @@
+<div class="weather-widget">
+    <ng-container *ngIf="weatherData$ | async as weatherData">
+      <ul class="weather-list">
+        <li *ngFor="let data of weatherData" 
+            [ngClass]="{'clear': data.weather[0].main === 'Clear', 
+                        'clouds': data.weather[0].main === 'Clouds', 
+                        'rain': data.weather[0].main === 'Rain',
+                        'snow': data.weather[0].main === 'Snow'}" 
+            (click)="openCityPage(data.name)" 
+            class="weather-item">
+          <div class="weather-info">
+            <h2>{{ data.name }}</h2>
+            <p>{{ roundTemperature(data.main.temp) }}°C</p>
+            <p>{{ data.weather[0].description }}</p>
+          </div>
+        </li>
+      </ul>
+    </ng-container>
+  </div>
+  
