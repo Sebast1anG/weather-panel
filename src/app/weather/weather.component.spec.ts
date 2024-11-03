@@ -1,65 +1,124 @@
-import { TestBed, ComponentFixture } from '@angular/core/testing';
-import { HttpClientTestingModule } from '@angular/common/http/testing';
+import {
+  ComponentFixture,
+  TestBed,
+  discardPeriodicTasks,
+  fakeAsync,
+  tick,
+} from '@angular/core/testing';
 import { WeatherComponent } from './weather.component';
 import { WeatherService } from '../weather.service';
 import { of } from 'rxjs';
-import { CommonModule } from '@angular/common';
+import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { WeatherData } from './weather.types';
+import { CITY_MAP, CITIES_REFRESH_INTERVAL } from './weather.constants';
 
 describe('WeatherComponent', () => {
   let component: WeatherComponent;
   let fixture: ComponentFixture<WeatherComponent>;
   let weatherService: WeatherService;
 
+  const mockWeatherData: WeatherData[] = [
+    {
+      name: 'London',
+      main: { temp: 20 },
+      weather: [
+        {
+          main: 'Clear',
+          description: 'clear sky',
+          icon: '01d',
+        },
+      ],
+    },
+    {
+      name: 'Warsaw',
+      main: { temp: 22 },
+      weather: [
+        {
+          main: 'Clouds',
+          description: 'scattered clouds',
+          icon: '03d',
+        },
+      ],
+    },
+  ];
+
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule, CommonModule],
-      declarations: [WeatherComponent],
-      providers: [WeatherService],
+      imports: [HttpClientTestingModule],
+      providers: [
+        {
+          provide: WeatherService,
+          useValue: {
+            getRandomCities: () => of(['London', 'Warsaw']),
+            getWeatherForCities: () => of(mockWeatherData),
+          },
+        },
+      ],
     }).compileComponents();
 
     weatherService = TestBed.inject(WeatherService);
+  });
+
+  beforeEach(() => {
     fixture = TestBed.createComponent(WeatherComponent);
     component = fixture.componentInstance;
+    fixture.detectChanges();
   });
 
   it('should create', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should initialize cities and weather data', () => {
-    const cities = ['London', 'Berlin', 'New York'];
-    spyOn(weatherService, 'getRandomCities').and.returnValue(of(cities));
-    const dummyWeather = [
-      {
-        main: { temp: 20 },
-        weather: [{ description: 'clear sky', icon: '01d' }],
-      },
-      { main: { temp: 25 }, weather: [{ description: 'cloudy', icon: '02d' }] },
-      { main: { temp: 30 }, weather: [{ description: 'sunny', icon: '01d' }] },
-    ];
-    spyOn(weatherService, 'getWeatherForCities').and.returnValue(
-      of(dummyWeather)
-    );
-
+  it('should initialize cities refresh', fakeAsync(() => {
+    const spyGetRandomCities = spyOn(
+      weatherService,
+      'getRandomCities'
+    ).and.returnValue(of(['London', 'Warsaw']));
     component.ngOnInit();
-    fixture.detectChanges();
+    tick(CITIES_REFRESH_INTERVAL);
+    expect(spyGetRandomCities).toHaveBeenCalled();
+    discardPeriodicTasks();
+  }));
 
-    component.weatherData$.subscribe((data) => {
-      expect(data).toEqual(dummyWeather);
-    });
+  it('should track by city name', () => {
+    expect(component.trackByCity(0, mockWeatherData[0])).toBe('London');
   });
 
-  it('should open city page', () => {
+  it('should round temperature correctly', () => {
+    expect(component.roundTemperature(20.6)).toBe(21);
+    expect(component.roundTemperature(20.4)).toBe(20);
+  });
+
+  it('should get weather class', () => {
+    expect(component.getWeatherClass(mockWeatherData[0].weather[0].main)).toBe(
+      'clear'
+    );
+  });
+
+  it('should open city page for known city', () => {
     spyOn(window, 'open');
     component.openCityPage('London');
     expect(window.open).toHaveBeenCalledWith(
-      'https://openweathermap.org/city/2643743',
+      `https://openweathermap.org/city/${CITY_MAP['London']}`,
       '_blank'
     );
   });
 
-  it('should round temperature correctly', () => {
-    expect(component.roundTemperature(12.53)).toBe(13);
-    expect(component.roundTemperature(12.49)).toBe(12);
+  it('should not open city page for unknown city', () => {
+    spyOn(window, 'open');
+    component.openCityPage('Unknown');
+    expect(window.open).not.toHaveBeenCalled();
+  });
+
+  it('should clean up on destroy', () => {
+    const completeSpy = spyOn(
+      component['destroy$'],
+      'complete'
+    ).and.callThrough();
+
+    component.ngOnInit();
+    component.ngOnDestroy();
+
+    expect(completeSpy).toHaveBeenCalled();
   });
 });

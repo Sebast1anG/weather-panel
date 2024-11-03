@@ -4,6 +4,8 @@ import {
   HttpTestingController,
 } from '@angular/common/http/testing';
 import { WeatherService } from './weather.service';
+import { WeatherData } from './weather/weather.types';
+import { environment } from '../environmets/environment';
 
 describe('WeatherService', () => {
   let service: WeatherService;
@@ -26,54 +28,76 @@ describe('WeatherService', () => {
     expect(service).toBeTruthy();
   });
 
-  it('should return random cities', (done) => {
-    service.getRandomCities().subscribe((cities) => {
-      expect(cities.length).toBe(3);
-      expect(service['cities']).toContain(cities[0]);
-      done();
+  describe('getRandomCities', () => {
+    it('should return an array of 3 random cities', (done) => {
+      service.getRandomCities().subscribe((cities) => {
+        expect(cities.length).toBe(3);
+        expect(service['cities']).toEqual(jasmine.arrayContaining(cities));
+        done();
+      });
     });
   });
 
-  it('should fetch weather data', (done) => {
-    const dummyWeather = {
-      main: { temp: 20 },
-      weather: [{ description: 'clear sky', icon: '01d' }],
-    };
-    const city = 'London';
+  describe('getWeatherForCities', () => {
+    it('should fetch weather data for each provided city', (done) => {
+      const mockCities = ['Lodz', 'Berlin', 'London'];
+      const mockWeatherData: WeatherData[] = [
+        {
+          name: 'Lodz',
+          main: { temp: 15 },
+          weather: [
+            {
+              main: 'Clear',
+              description: '',
+              icon: '',
+            },
+          ],
+        },
+        {
+          name: 'Berlin',
+          main: { temp: 20 },
+          weather: [
+            {
+              main: 'Clouds',
+              description: '',
+              icon: '',
+            },
+          ],
+        },
+        {
+          name: 'London',
+          main: { temp: 18 },
+          weather: [
+            {
+              main: 'Rain',
+              description: '',
+              icon: '',
+            },
+          ],
+        },
+      ];
 
-    service.getWeather(city).subscribe((weather) => {
-      expect(weather.main.temp).toBe(20);
-      expect(weather.weather[0].description).toBe('clear sky');
-      done();
+      service.getWeatherForCities(mockCities).subscribe((data) => {
+        expect(data).toEqual(mockWeatherData);
+        done();
+      });
+
+      mockCities.forEach((city, index) => {
+        const req = httpMock.expectOne(
+          `${environment.weatherApiUrl}?q=${city}&appid=${environment.weatherApiKey}&units=metric`
+        );
+        expect(req.request.method).toBe('GET');
+        req.flush(mockWeatherData[index]);
+      });
     });
-
-    const req = httpMock.expectOne(
-      `${service['apiUrl']}?q=${city}&appid=${service['apiKey']}&units=metric`
-    );
-    expect(req.request.method).toBe('GET');
-    req.flush(dummyWeather);
   });
 
-  it('should fetch weather data for cities', (done) => {
-    const dummyWeather = {
-      main: { temp: 20 },
-      weather: [{ description: 'clear sky', icon: '01d' }],
-    };
-    const cities = ['London', 'Berlin'];
-
-    service.getWeatherForCities(cities).subscribe((weatherArray) => {
-      expect(weatherArray.length).toBe(2);
-      expect(weatherArray[0].main.temp).toBe(20);
-      expect(weatherArray[1].weather[0].description).toBe('clear sky');
-      done();
-    });
-
-    cities.forEach((city) => {
-      const req = httpMock.expectOne(
-        `${service['apiUrl']}?q=${city}&appid=${service['apiKey']}&units=metric`
-      );
-      expect(req.request.method).toBe('GET');
-      req.flush(dummyWeather);
+  describe('shuffleArray', () => {
+    it('should return a shuffled array', () => {
+      const array = [1, 2, 3, 4, 5];
+      const shuffledArray = service['shuffleArray'](array);
+      expect(shuffledArray).not.toEqual(array);
+      expect(shuffledArray.sort()).toEqual(array.sort());
     });
   });
 });

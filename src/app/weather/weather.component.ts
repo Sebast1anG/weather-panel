@@ -1,33 +1,65 @@
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  OnDestroy,
+  inject,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { HttpClientModule } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { WeatherService } from '../weather.service';
-import { Observable, Subject, timer } from 'rxjs';
-import { switchMap, takeUntil } from 'rxjs/operators';
+import {
+  Observable,
+  Subject,
+  timer,
+  BehaviorSubject,
+  combineLatest,
+} from 'rxjs';
+import {
+  switchMap,
+  takeUntil,
+  shareReplay,
+  map,
+  mergeMap,
+} from 'rxjs/operators';
+import { WeatherData } from './weather.types';
+import {
+  CITY_MAP,
+  WEATHER_REFRESH_INTERVAL,
+  CITIES_REFRESH_INTERVAL,
+} from './weather.constants';
 
 @Component({
   selector: 'app-weather',
   standalone: true,
   templateUrl: './weather.component.html',
-  styleUrls: ['./weather.component.css'],
+  styleUrls: ['./weather.component.scss'],
   imports: [HttpClientModule, CommonModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class WeatherComponent implements OnInit, OnDestroy {
-  private weatherService = inject(WeatherService);
-  private destroy$ = new Subject<void>();
-  weatherData$: Observable<any[]> = new Observable<any[]>();
-  cities: string[] = [];
+  [x: string]: any;
+  private readonly weatherService = inject(WeatherService);
+  private readonly destroy$ = new Subject<void>();
+  private readonly citiesSubject = new BehaviorSubject<string[]>([]);
+
+  readonly cities$ = this.citiesSubject.asObservable();
+  readonly weatherData$: Observable<WeatherData[]> = combineLatest([
+    this.cities$,
+    timer(0, WEATHER_REFRESH_INTERVAL),
+  ]).pipe(
+    map(([cities]) => cities),
+    mergeMap((cities) => this.weatherService.getWeatherForCities(cities)),
+    shareReplay(1),
+    takeUntil(this.destroy$)
+  );
 
   ngOnInit(): void {
-    this.updateCities();
-    timer(0, 60000)
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(() => this.updateCities());
+    this.initializeCitiesRefresh();
+  }
 
-    this.weatherData$ = timer(0, 10000).pipe(
-      switchMap(() => this.weatherService.getWeatherForCities(this.cities)),
-      takeUntil(this.destroy$)
-    );
+  trackByCity(_index: number, weatherData: WeatherData): string {
+    return weatherData.name;
   }
 
   ngOnDestroy(): void {
@@ -35,24 +67,27 @@ export class WeatherComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  updateCities() {
-    this.weatherService.getRandomCities().subscribe((cities) => {
-      this.cities = cities;
-    });
-  }
-
-  openCityPage(city: string) {
-    const cityMap: { [key: string]: string } = {
-      Łódź: '3337493',
-      Warsaw: '756135',
-      Berlin: '2950159',
-      'New York': '5128581',
-      London: '2643743',
-    };
-    window.open(`https://openweathermap.org/city/${cityMap[city]}`, '_blank');
+  openCityPage(city: string): void {
+    const cityId = CITY_MAP[city];
+    if (cityId) {
+      window.open(`https://openweathermap.org/city/${cityId}`, '_blank');
+    }
   }
 
   roundTemperature(temp: number): number {
-    return temp % 1 >= 0.5 ? Math.ceil(temp) : Math.floor(temp);
+    return Math.round(temp);
+  }
+
+  getWeatherClass(weatherMain: string): string {
+    return weatherMain.toLowerCase();
+  }
+
+  private initializeCitiesRefresh(): void {
+    timer(0, CITIES_REFRESH_INTERVAL)
+      .pipe(
+        switchMap(() => this.weatherService.getRandomCities()),
+        takeUntil(this.destroy$)
+      )
+      .subscribe((cities) => this.citiesSubject.next(cities));
   }
 }

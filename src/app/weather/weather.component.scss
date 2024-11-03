@@ -1,0 +1,99 @@
+@use 'sass:map';
+
+$breakpoints: (
+  tablet: 768px,
+  mobile: 480px
+);
+
+$weather-backgrounds: (
+  "clear": '../../assets/backgrounds/sky.jpg',
+  "clouds": '../../assets/backgrounds/cloudy.jpg',
+  "rain": '../../assets/backgrounds/rainy.jpg',
+  "snow": '../../assets/backgrounds/snow.png'
+);
+
+@mixin respond-to($breakpoint) {
+  @media (max-width: map.get($breakpoints, $breakpoint)) {
+    @content;
+  }
+}
+
+.weather-widget {
+  background-color: #f9f9f9;
+  border-radius: 15px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  max-width: 600px;
+  margin: 20px auto;
+}
+
+.weather-list {
+  display: flex;
+  justify-content: space-between;
+  padding: 0;
+  list-style: none;
+  margin: 0;
+  flex-wrap: wrap;
+}
+
+.weather-item {
+  background-color: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 10px;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  flex: 1;
+  margin: 0 10px;
+  background-size: cover;
+  background-position: center;
+  color: #262424;
+
+  @each $weather, $background in $weather-backgrounds {
+    &.#{$weather} {
+      background-image: url($background);
+    }
+  }
+
+  &:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+  }
+}
+
+.weather-info {
+  border-left: 1px solid #ddd;
+  padding-left: 10px;
+
+  &:first-child {
+    border-left: none;
+  }
+
+  p {
+    margin: 5px 0;
+  }
+}
+
+@include respond-to(tablet) {
+  .weather-list {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .weather-item {
+    margin: 5px 0;
+    flex: none;
+    width: 90%;
+  }
+}
+
+@include respond-to(mobile) {
+  .weather-widget {
+    padding: 15px;
+  }
+
+  .weather-item {
+    padding: 8px;
+  }
+}
